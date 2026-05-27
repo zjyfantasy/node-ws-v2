@@ -1,0 +1,2058 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>从组件库到 Design System - 前端UI架构演进</title>
+    <script src="https://cdn.tailwindcss.com">
+    </script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        bg: '#0a0a0f',
+                        surface: '#16161f',
+                        card: '#1e1e2c',
+                        accent: '#7c5cfc',
+                        accent2: '#4f8fff',
+                        gold: '#f0b849',
+                        red: '#f44b5c',
+                        green: '#3dd68c',
+                        muted: '#8b8b9e',
+                    },
+                    fontFamily: {
+                        sans: ['"PingFang SC"', '"Microsoft YaHei"', '"Helvetica Neue"', 'system-ui', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', '"Fira Code"', '"SF Mono"', 'Consolas', 'monospace'],
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        :root {
+            --transition-speed: 380ms;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #0a0a0f;
+            font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', system-ui, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* 主舞台 */
+        .stage {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #0a0a0f;
+            background-image:
+                radial-gradient(ellipse at 30% 20%, rgba(124, 92, 252, 0.06) 0%, transparent 60%),
+                radial-gradient(ellipse at 70% 80%, rgba(79, 143, 255, 0.05) 0%, transparent 60%),
+                radial-gradient(ellipse at 50% 50%, rgba(120, 100, 240, 0.03) 0%, transparent 80%);
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* 幻灯片容器 */
+        .slides-wrapper {
+            position: relative;
+            width: 90vw;
+            max-width: 1100px;
+            height: 82vh;
+            max-height: 720px;
+            overflow: hidden;
+            border-radius: 20px;
+            background: #16161f;
+            box-shadow:
+                0 0 0 1px rgba(255, 255, 255, 0.06),
+                0 30px 80px rgba(0, 0, 0, 0.5),
+                0 0 120px rgba(124, 92, 252, 0.08);
+        }
+
+        /* 单张幻灯片 */
+        .slide {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 50px 60px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1),
+                transform var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1);
+            transform: translateX(0);
+            will-change: opacity, transform;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+        .slide.active {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateX(0);
+            z-index: 10;
+        }
+        .slide.exit-left {
+            opacity: 0;
+            transform: translateX(-60px);
+            z-index: 5;
+            pointer-events: none;
+        }
+        .slide.exit-right {
+            opacity: 0;
+            transform: translateX(60px);
+            z-index: 5;
+            pointer-events: none;
+        }
+        .slide.enter-from-left {
+            opacity: 0;
+            transform: translateX(-60px);
+            z-index: 5;
+            pointer-events: none;
+        }
+        .slide.enter-from-right {
+            opacity: 0;
+            transform: translateX(60px);
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        /* 封面特殊样式 */
+        .slide-cover {
+            text-align: center;
+            justify-content: center;
+        }
+        .slide-cover .cover-badge {
+            display: inline-block;
+            padding: 6px 18px;
+            border-radius: 20px;
+            background: rgba(124, 92, 252, 0.15);
+            border: 1px solid rgba(124, 92, 252, 0.3);
+            color: #b8a4ff;
+            font-size: 0.85rem;
+            letter-spacing: 0.04em;
+            margin-bottom: 28px;
+        }
+        .slide-cover .cover-title {
+            font-size: 2.8rem;
+            font-weight: 700;
+            color: #fff;
+            line-height: 1.25;
+            letter-spacing: -0.02em;
+            margin: 0 0 10px;
+        }
+        .slide-cover .cover-subtitle {
+            font-size: 1.35rem;
+            color: #b8b8cc;
+            font-weight: 400;
+            margin: 0 0 36px;
+            letter-spacing: 0.01em;
+        }
+        .slide-cover .cover-meta {
+            font-size: 0.9rem;
+            color: #6b6b82;
+            letter-spacing: 0.03em;
+        }
+
+        /* 金句页 */
+        .slide-quote {
+            text-align: center;
+            justify-content: center;
+        }
+        .slide-quote .quote-mark {
+            font-size: 5rem;
+            color: rgba(124, 92, 252, 0.3);
+            line-height: 1;
+            margin-bottom: -10px;
+            font-family: Georgia, 'Times New Roman', serif;
+        }
+        .slide-quote .quote-text {
+            font-size: 2rem;
+            font-weight: 600;
+            color: #fff;
+            line-height: 1.5;
+            max-width: 700px;
+            letter-spacing: -0.01em;
+        }
+        .slide-quote .quote-text .highlight {
+            color: #7c5cfc;
+            font-weight: 700;
+        }
+
+        /* 章节标题 */
+        .section-label {
+            display: inline-block;
+            padding: 5px 14px;
+            border-radius: 14px;
+            font-size: 0.78rem;
+            font-weight: 500;
+            letter-spacing: 0.04em;
+            margin-bottom: 16px;
+        }
+        .section-label.red {
+            background: rgba(244, 75, 92, 0.12);
+            color: #f44b5c;
+            border: 1px solid rgba(244, 75, 92, 0.25);
+        }
+        .section-label.green {
+            background: rgba(61, 214, 140, 0.12);
+            color: #3dd68c;
+            border: 1px solid rgba(61, 214, 140, 0.25);
+        }
+        .section-label.accent {
+            background: rgba(124, 92, 252, 0.12);
+            color: #b8a4ff;
+            border: 1px solid rgba(124, 92, 252, 0.25);
+        }
+        .section-label.gold {
+            background: rgba(240, 184, 73, 0.12);
+            color: #f0b849;
+            border: 1px solid rgba(240, 184, 73, 0.25);
+        }
+
+        /* 对比卡片 */
+        .compare-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            width: 100%;
+            max-width: 900px;
+        }
+        .compare-card {
+            padding: 28px 24px;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            text-align: left;
+        }
+        .compare-card.bad {
+            background: rgba(244, 75, 92, 0.06);
+            border-color: rgba(244, 75, 92, 0.2);
+        }
+        .compare-card.good {
+            background: rgba(61, 214, 140, 0.06);
+            border-color: rgba(61, 214, 140, 0.2);
+        }
+        .compare-card h4 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin: 0 0 10px;
+        }
+        .compare-card.bad h4 {
+            color: #f44b5c;
+        }
+        .compare-card.good h4 {
+            color: #3dd68c;
+        }
+        .compare-card ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            font-size: 0.9rem;
+            color: #c0c0d0;
+            line-height: 1.8;
+        }
+        .compare-card ul li::before {
+            content: '';
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            margin-right: 8px;
+            vertical-align: middle;
+            position: relative;
+            top: -1px;
+        }
+        .compare-card.bad ul li::before {
+            background: #f44b5c;
+        }
+        .compare-card.good ul li::before {
+            background: #3dd68c;
+        }
+
+        /* 代码块 */
+        .code-block {
+            background: #0d0d16;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 18px 22px;
+            font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+            font-size: 0.85rem;
+            color: #d4d4e8;
+            line-height: 1.7;
+            text-align: left;
+            overflow-x: auto;
+            white-space: pre;
+            width: 100%;
+            max-width: 700px;
+        }
+        .code-block .kw {
+            color: #c792ea;
+        }
+        .code-block .fn {
+            color: #82aaff;
+        }
+        .code-block .str {
+            color: #c3e88d;
+        }
+        .code-block .cmt {
+            color: #5c6370;
+        }
+        .code-block .prop {
+            color: #f78c6c;
+        }
+
+        /* 架构图 */
+        .arch-flow {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            max-width: 600px;
+        }
+        .arch-box {
+            padding: 14px 28px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            text-align: center;
+            width: 100%;
+            letter-spacing: 0.02em;
+        }
+        .arch-box.top {
+            background: rgba(244, 75, 92, 0.1);
+            border: 1px solid rgba(244, 75, 92, 0.3);
+            color: #f44b5c;
+        }
+        .arch-box.mid {
+            background: rgba(79, 143, 255, 0.1);
+            border: 1px solid rgba(79, 143, 255, 0.3);
+            color: #4f8fff;
+        }
+        .arch-box.bot {
+            background: rgba(61, 214, 140, 0.1);
+            border: 1px solid rgba(61, 214, 140, 0.3);
+            color: #3dd68c;
+        }
+        .arch-arrow {
+            color: #6b6b82;
+            font-size: 1.4rem;
+            line-height: 1;
+        }
+
+        /* 导航按钮 */
+        .nav-btn {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 100;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(30, 30, 44, 0.85);
+            color: #fff;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            transition: all 0.2s;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+        .nav-btn:hover {
+            background: rgba(124, 92, 252, 0.3);
+            border-color: rgba(124, 92, 252, 0.5);
+            box-shadow: 0 0 24px rgba(124, 92, 252, 0.2);
+        }
+        .nav-btn:active {
+            transform: translateY(-50%) scale(0.93);
+        }
+        .nav-btn.prev {
+            left: calc((100vw - 90vw) / 4 - 24px);
+        }
+        .nav-btn.next {
+            right: calc((100vw - 90vw) / 4 - 24px);
+        }
+        @media (max-width: 1200px) {
+            .nav-btn.prev {
+                left: 10px;
+            }
+            .nav-btn.next {
+                right: 10px;
+            }
+        }
+        @media (max-width: 768px) {
+            .nav-btn {
+                width: 38px;
+                height: 38px;
+                font-size: 1rem;
+            }
+            .nav-btn.prev {
+                left: 6px;
+            }
+            .nav-btn.next {
+                right: 6px;
+            }
+            .slides-wrapper {
+                width: 94vw;
+                height: 78vh;
+                max-height: 600px;
+                border-radius: 14px;
+            }
+            .slide {
+                padding: 28px 20px;
+            }
+            .slide-cover .cover-title {
+                font-size: 1.6rem;
+            }
+            .slide-cover .cover-subtitle {
+                font-size: 1rem;
+            }
+            .slide-quote .quote-text {
+                font-size: 1.3rem;
+            }
+            .compare-grid {
+                grid-template-columns: 1fr;
+                gap: 14px;
+            }
+            .code-block {
+                font-size: 0.7rem;
+                padding: 12px 14px;
+            }
+        }
+        @media (max-width: 480px) {
+            .slides-wrapper {
+                width: 96vw;
+                height: 75vh;
+                max-height: 500px;
+                border-radius: 10px;
+            }
+            .slide {
+                padding: 18px 12px;
+            }
+            .slide-cover .cover-title {
+                font-size: 1.3rem;
+            }
+            .slide-cover .cover-subtitle {
+                font-size: 0.85rem;
+            }
+            .slide-quote .quote-text {
+                font-size: 1.1rem;
+            }
+            .nav-btn {
+                width: 32px;
+                height: 32px;
+                font-size: 0.8rem;
+            }
+        }
+
+        /* 底部指示器 */
+        .indicator-bar {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(22, 22, 31, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 8px 16px;
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .indicator-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            transition: all 0.25s;
+            flex-shrink: 0;
+        }
+        .indicator-dot.active {
+            background: #7c5cfc;
+            box-shadow: 0 0 10px rgba(124, 92, 252, 0.6);
+            width: 20px;
+            border-radius: 10px;
+        }
+        .indicator-dot:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+        .indicator-num {
+            color: #8b8b9e;
+            font-size: 0.75rem;
+            font-weight: 500;
+            letter-spacing: 0.03em;
+            padding: 0 4px;
+            cursor: default;
+            flex-shrink: 0;
+        }
+        @media (max-width: 600px) {
+            .indicator-bar {
+                gap: 3px;
+                padding: 6px 10px;
+                bottom: 10px;
+            }
+            .indicator-dot {
+                width: 5px;
+                height: 5px;
+            }
+            .indicator-dot.active {
+                width: 14px;
+                border-radius: 7px;
+            }
+            .indicator-num {
+                font-size: 0.65rem;
+            }
+        }
+
+        /* 全屏按钮 */
+        .fullscreen-btn {
+            position: fixed;
+            top: 16px;
+            right: 20px;
+            z-index: 100;
+            background: rgba(22, 22, 31, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #aaa;
+            padding: 8px 14px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            letter-spacing: 0.03em;
+        }
+        .fullscreen-btn:hover {
+            color: #fff;
+            border-color: rgba(255, 255, 255, 0.3);
+            background: rgba(30, 30, 44, 0.8);
+        }
+        @media (max-width: 600px) {
+            .fullscreen-btn {
+                top: 8px;
+                right: 8px;
+                padding: 6px 10px;
+                font-size: 0.7rem;
+            }
+        }
+
+        /* 列表样式 */
+        .content-list {
+            text-align: left;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            font-size: 1.05rem;
+            color: #d0d0dd;
+            line-height: 2;
+            max-width: 750px;
+            width: 100%;
+        }
+        .content-list li {
+            padding-left: 24px;
+            position: relative;
+        }
+        .content-list li::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #7c5cfc;
+            opacity: 0.7;
+        }
+        .content-list li.headless-item::before {
+            background: #3dd68c;
+        }
+
+        .slide-title {
+            font-size: 1.7rem;
+            font-weight: 700;
+            color: #fff;
+            margin: 0 0 8px;
+            letter-spacing: -0.01em;
+            text-align: center;
+        }
+        .slide-subtitle {
+            font-size: 0.95rem;
+            color: #8b8b9e;
+            margin: 0 0 28px;
+            text-align: center;
+            letter-spacing: 0.02em;
+        }
+        @media (max-width: 768px) {
+            .slide-title {
+                font-size: 1.25rem;
+            }
+            .slide-subtitle {
+                font-size: 0.8rem;
+                margin-bottom: 16px;
+            }
+            .content-list {
+                font-size: 0.85rem;
+                line-height: 1.7;
+            }
+        }
+
+        /* 痛点三列 */
+        .pain-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 18px;
+            width: 100%;
+            max-width: 900px;
+        }
+        .pain-card {
+            background: rgba(244, 75, 92, 0.04);
+            border: 1px solid rgba(244, 75, 92, 0.18);
+            border-radius: 12px;
+            padding: 22px 18px;
+            text-align: center;
+        }
+        .pain-card h4 {
+            color: #f44b5c;
+            font-size: 1rem;
+            font-weight: 600;
+            margin: 0 0 8px;
+        }
+        .pain-card p {
+            color: #b0b0c0;
+            font-size: 0.82rem;
+            line-height: 1.6;
+            margin: 0;
+        }
+        @media (max-width: 768px) {
+            .pain-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+        }
+
+        /* 趋势卡片 */
+        .trend-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            width: 100%;
+            max-width: 800px;
+        }
+        .trend-card {
+            background: rgba(124, 92, 252, 0.04);
+            border: 1px solid rgba(124, 92, 252, 0.18);
+            border-radius: 12px;
+            padding: 20px 18px;
+            text-align: center;
+        }
+        .trend-card h4 {
+            color: #b8a4ff;
+            font-size: 1.05rem;
+            font-weight: 600;
+            margin: 0 0 6px;
+        }
+        .trend-card p {
+            color: #b0b0c0;
+            font-size: 0.82rem;
+            line-height: 1.5;
+            margin: 0;
+        }
+        @media (max-width: 600px) {
+            .trend-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+        }
+
+        /* 目录列表 */
+        .toc-list {
+            text-align: left;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            font-size: 1rem;
+            color: #d0d0dd;
+            line-height: 2.2;
+            max-width: 650px;
+            width: 100%;
+            counter-reset: toc;
+        }
+        .toc-list li {
+            padding-left: 36px;
+            position: relative;
+            counter-increment: toc;
+        }
+        .toc-list li::before {
+            content: counter(toc, decimal-leading-zero);
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #7c5cfc;
+            opacity: 0.8;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            letter-spacing: 0.04em;
+        }
+
+        /* 双栏代码对比 */
+        .code-compare {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            width: 100%;
+            max-width: 900px;
+        }
+        .code-compare-col {
+            text-align: left;
+        }
+        .code-compare-col .col-label {
+            font-size: 0.82rem;
+            font-weight: 600;
+            margin: 0 0 8px;
+            padding: 4px 12px;
+            border-radius: 6px;
+            display: inline-block;
+        }
+        .code-compare-col.bad .col-label {
+            background: rgba(244, 75, 92, 0.12);
+            color: #f44b5c;
+        }
+        .code-compare-col.good .col-label {
+            background: rgba(61, 214, 140, 0.12);
+            color: #3dd68c;
+        }
+        .code-compare-col .code-block {
+            max-width: 100%;
+            margin: 0;
+        }
+
+        /* 数据对比条 */
+        .data-bar-group {
+            width: 100%;
+            max-width: 750px;
+        }
+        .data-bar-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+        .data-bar-label {
+            color: #d0d0dd;
+            font-size: 0.85rem;
+            min-width: 100px;
+            text-align: right;
+            flex-shrink: 0;
+        }
+        .data-bar-track {
+            flex: 1;
+            height: 28px;
+            background: rgba(255, 255, 255, 0.04);
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+        }
+        .data-bar-fill {
+            height: 100%;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #fff;
+            white-space: nowrap;
+            transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .data-bar-fill.red {
+            background: linear-gradient(90deg, rgba(244,75,92,0.7), rgba(244,75,92,0.5));
+        }
+        .data-bar-fill.green {
+            background: linear-gradient(90deg, rgba(61,214,140,0.7), rgba(61,214,140,0.5));
+        }
+        .data-bar-fill.accent {
+            background: linear-gradient(90deg, rgba(124,92,252,0.7), rgba(124,92,252,0.5));
+        }
+        .data-bar-fill.blue {
+            background: linear-gradient(90deg, rgba(79,143,255,0.7), rgba(79,143,255,0.5));
+        }
+
+        /* 案例卡片 */
+        .case-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 22px 24px;
+            text-align: left;
+            width: 100%;
+            max-width: 750px;
+        }
+        .case-card .case-tag {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            margin-bottom: 10px;
+        }
+        .case-card .case-tag.real {
+            background: rgba(240, 184, 73, 0.12);
+            color: #f0b849;
+            border: 1px solid rgba(240, 184, 73, 0.25);
+        }
+        .case-card .case-tag.impact {
+            background: rgba(61, 214, 140, 0.12);
+            color: #3dd68c;
+            border: 1px solid rgba(61, 214, 140, 0.25);
+        }
+        .case-card h4 {
+            color: #fff;
+            font-size: 1rem;
+            margin: 0 0 8px;
+        }
+        .case-card p {
+            color: #b0b0c0;
+            font-size: 0.85rem;
+            line-height: 1.7;
+            margin: 0;
+        }
+
+        /* 痛点案例详情 */
+        .pain-detail {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            width: 100%;
+            max-width: 850px;
+        }
+        .pain-detail-card {
+            background: rgba(244, 75, 92, 0.04);
+            border: 1px solid rgba(244, 75, 92, 0.15);
+            border-radius: 10px;
+            padding: 16px 18px;
+            text-align: left;
+        }
+        .pain-detail-card h5 {
+            color: #f44b5c;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin: 0 0 6px;
+        }
+        .pain-detail-card .code-block {
+            font-size: 0.72rem;
+            padding: 10px 12px;
+            max-width: 100%;
+            margin: 6px 0 0;
+            line-height: 1.5;
+        }
+        .pain-detail-card p {
+            color: #b0b0c0;
+            font-size: 0.8rem;
+            line-height: 1.5;
+            margin: 4px 0 0;
+        }
+
+        /* 标签徽章 */
+        .metric-row {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+        .metric-item {
+            text-align: center;
+            padding: 14px 20px;
+            border-radius: 10px;
+            min-width: 120px;
+        }
+        .metric-item .metric-value {
+            font-size: 1.6rem;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+        .metric-item .metric-label {
+            font-size: 0.78rem;
+            margin-top: 4px;
+            opacity: 0.8;
+        }
+        .metric-item.red {
+            background: rgba(244, 75, 92, 0.08);
+            border: 1px solid rgba(244, 75, 92, 0.2);
+        }
+        .metric-item.red .metric-value { color: #f44b5c; }
+        .metric-item.red .metric-label { color: #f44b5c; }
+        .metric-item.green {
+            background: rgba(61, 214, 140, 0.08);
+            border: 1px solid rgba(61, 214, 140, 0.2);
+        }
+        .metric-item.green .metric-value { color: #3dd68c; }
+        .metric-item.green .metric-label { color: #3dd68c; }
+        .metric-item.accent {
+            background: rgba(124, 92, 252, 0.08);
+            border: 1px solid rgba(124, 92, 252, 0.2);
+        }
+        .metric-item.accent .metric-value { color: #b8a4ff; }
+        .metric-item.accent .metric-label { color: #b8a4ff; }
+        .metric-item.blue {
+            background: rgba(79, 143, 255, 0.08);
+            border: 1px solid rgba(79, 143, 255, 0.2);
+        }
+        .metric-item.blue .metric-value { color: #4f8fff; }
+        .metric-item.blue .metric-label { color: #4f8fff; }
+
+        @media (max-width: 768px) {
+            .code-compare {
+                grid-template-columns: 1fr;
+            }
+            .pain-detail {
+                grid-template-columns: 1fr;
+            }
+            .data-bar-label {
+                min-width: 70px;
+                font-size: 0.75rem;
+            }
+            .metric-row {
+                gap: 10px;
+            }
+            .metric-item {
+                min-width: 90px;
+                padding: 10px 14px;
+            }
+            .metric-item .metric-value {
+                font-size: 1.2rem;
+            }
+        }
+
+        /* 滚动条美化 */
+        .slide::-webkit-scrollbar {
+            width: 4px;
+        }
+        .slide::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .slide::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 全屏按钮 -->
+    <button class="fullscreen-btn" onclick="toggleFullscreen()" title="全屏切换 (F)">
+        ⛶ 全屏
+    </button>
+
+    <!-- 导航按钮 -->
+    <button class="nav-btn prev" onclick="prevSlide()" aria-label="上一页" title="上一页 (←)">
+        ◀
+    </button>
+    <button class="nav-btn next" onclick="nextSlide()" aria-label="下一页" title="下一页 (→)">
+        ▶
+    </button>
+
+    <!-- 底部指示器 -->
+    <div class="indicator-bar" id="indicatorBar"></div>
+
+    <!-- 主舞台 -->
+    <div class="stage" id="stage">
+        <div class="slides-wrapper" id="slidesWrapper">
+
+            <!-- ==================== 第1页：封面 ==================== -->
+            <div class="slide slide-cover active" data-index="0">
+                <div class="cover-badge">前端 UI 架构演进 · AI 时代新范式</div>
+                <h1 class="cover-title">从组件库到 Design System</h1>
+                <p class="cover-subtitle">无头组件与 Tailwind 正在重构前端 UI 架构</p>
+                <p class="cover-meta">XXX 部门 / XXX / 2026</p>
+            </div>
+
+            <!-- ==================== 第2页：目录 ==================== -->
+            <div class="slide" data-index="1">
+                <h2 class="slide-title">分享大纲</h2>
+                <p class="slide-subtitle">本次分享的完整结构</p>
+                <ul class="toc-list">
+                    <li>传统 UI 架构：痛点与困境</li>
+                    <li>核心破局：Headless UI 原理与价值</li>
+                    <li>趋势爆发：Tailwind 架构级意义</li>
+                    <li>未来标杆：shadcn/ui 范式革新</li>
+                    <li>AI 赋能：AI Coding 驱动 UI 变革</li>
+                    <li>趋势总结：下一代前端 UI 架构</li>
+                    <li>实战 Demo 与落地建议</li>
+                    <li>Q&A</li>
+                </ul>
+            </div>
+
+            <!-- ==================== 第3页：开场灵魂拷问 ==================== -->
+            <div class="slide" data-index="2">
+                <span class="section-label gold">灵魂拷问</span>
+                <h2 class="slide-title">为什么越来越多团队放弃传统 UI 框架？</h2>
+                <p class="slide-subtitle">从 Ant Design、Element Plus 到 shadcn/ui</p>
+                <div style="max-width:700px;text-align:center;">
+                    <p style="color:#e0e0ee;font-size:1.05rem;line-height:1.7;margin:0 0 8px;">
+                        <strong style="color:#f0b849;">前端 UI 正在发生范式级转移</strong>
+                    </p>
+                    <p style="color:#b0b0c0;font-size:0.9rem;line-height:1.6;margin:0 0 16px;">
+                        过去：组件库越做越重、魔改越来越难<br>
+                        现在：Headless UI / Tailwind / shadcn/ui 全面崛起
+                    </p>
+                    <div class="metric-row" style="margin-top:16px;">
+                        <div class="metric-item red">
+                            <div class="metric-value">60%+</div>
+                            <div class="metric-label">样式覆盖代码</div>
+                        </div>
+                        <div class="metric-item red">
+                            <div class="metric-value">3-5x</div>
+                            <div class="metric-label">定制开发成本</div>
+                        </div>
+                        <div class="metric-item green">
+                            <div class="metric-value">10x</div>
+                            <div class="metric-label">shadcn/ui 增长速度</div>
+                        </div>
+                    </div>
+                    <p style="color:#7c5cfc;font-weight:600;font-size:0.95rem;margin-top:16px;">
+                        这不是新轮子，而是<u>架构底层重构</u>
+                    </p>
+                </div>
+            </div>
+
+            <!-- ==================== 第4页：传统组件库工作模式 ==================== -->
+            <div class="slide" data-index="3">
+                <span class="section-label red">传统模式</span>
+                <h2 class="slide-title">传统 UI 组件：强耦合一体设计</h2>
+                <p class="slide-subtitle">组件 = 逻辑 + 样式 + DOM 结构（三者强绑定）</p>
+                <div class="compare-grid" style="max-width:750px;">
+                    <div class="compare-card good">
+                        <h4>✅ 优点</h4>
+                        <ul>
+                            <li>开箱即用，5 分钟出页面</li>
+                            <li>上手极快，文档齐全</li>
+                            <li>适合后台管理类标准场景</li>
+                        </ul>
+                    </div>
+                    <div class="compare-card bad">
+                        <h4>❌ 代价</h4>
+                        <ul>
+                            <li>业务越复杂，Override 越多</li>
+                            <li>维护成本指数级上升</li>
+                            <li>升级版本 = 回归测试噩梦</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==================== 第5页：传统组件三大核心痛点 ==================== -->
+            <div class="slide" data-index="4">
+                <span class="section-label red">核心痛点</span>
+                <h2 class="slide-title">我们每天都在面对的困境</h2>
+                <p class="slide-subtitle">传统组件库的三大致命问题</p>
+                <div class="pain-grid">
+                    <div class="pain-card">
+                        <h4>🔴 样式失控</h4>
+                        <p>深度覆盖、!important 地狱<br>主题难以统一<br>5 层嵌套选择器是常态</p>
+                    </div>
+                    <div class="pain-card">
+                        <h4>🔴 组件黑盒</h4>
+                        <p>Table/Select/DatePicker<br>内部逻辑封闭<br>小改样式 → DOM 崩、状态崩、升级崩</p>
+                    </div>
+                    <div class="pain-card">
+                        <h4>🔴 设计系统割裂</h4>
+                        <p>设计师需求与前端实现<br>无法对齐<br>一处修改，全局受影响</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==================== 第6页：样式覆盖噩梦案例 ==================== -->
+            <div class="slide" data-index="5">
+                <span class="section-label red">真实案例</span>
+                <h2 class="slide-title">样式覆盖噩梦：Ant Design 真实场景</h2>
+                <p class="slide-subtitle">「只是想改个 Select 的圆角和颜色」</p>
+                <div class="pain-detail">
+                    <div class="pain-detail-card">
+                        <h5>❌ Ant Design 样式覆盖</h5>
+                        <div class="code-block"><span class="cmt">/* 改个 Select 圆角要写这么多 */</span>
+<span class="kw">.ant-select</span> .ant-select-selector {
+  <span class="prop">border-radius</span>: <span class="str">8px</span> <span class="kw">!important</span>;
+  <span class="prop">border-color</span>: <span class="str">#7c5cfc</span> <span class="kw">!important</span>;
+}
+<span class="kw">.ant-select-focused</span> .ant-select-selector {
+  <span class="prop">box-shadow</span>: <span class="str">0 0 0 2px</span>
+    <span class="str">rgba(124,92,252,0.2)</span> <span class="kw">!important</span>;
+}
+<span class="kw">.ant-select-dropdown</span> {
+  <span class="prop">border-radius</span>: <span class="str">12px</span> <span class="kw">!important</span>;
+}</div>
+                        <p>3 个 !important，且升级版本可能失效</p>
+                    </div>
+                    <div class="pain-detail-card" style="background:rgba(61,214,140,0.04);border-color:rgba(61,214,140,0.15);">
+                        <h5 style="color:#3dd68c;">✅ shadcn/ui 同样效果</h5>
+                        <div class="code-block"><span class="cmt">&lt;!-- 声明式，零覆盖 --&gt;</span>
+&lt;<span class="fn">Select</span>&gt;
+  &lt;<span class="fn">SelectTrigger</span>
+    <span class="prop">className</span>=<span class="str">"rounded-lg border-[#7c5cfc]
+      focus:ring-2 focus:ring-[#7c5cfc]/20"</span>
+  /&gt;
+  &lt;<span class="fn">SelectContent</span>
+    <span class="prop">className</span>=<span class="str">"rounded-xl"</span>
+  /&gt;
+&lt;/<span class="fn">Select</span>&gt;</div>
+                        <p>0 个 !important，完全可控</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==================== 第7页：核心追问 ==================== -->
+            <div class="slide slide-quote" data-index="6">
+                <div class="quote-mark">?</div>
+                <p class="quote-text" style="font-size:1.6rem;">组件到底应该<strong style="color:#fff;">负责什么</strong>？</p>
+                <p style="color:#7c5cfc;font-size:1.3rem;font-weight:600;margin-top:16px;">
+                    答案：只负责逻辑与交互，不负责视觉样式
+                </p>
+                <p style="color:#b0b0c0;font-size:1rem;margin-top:8px;">
+                    → 逻辑与视觉必须<strong style="color:#3dd68c;">彻底解耦</strong>
+                </p>
+            </div>
+
+            <!-- ==================== 第8页：Headless UI 定义 ==================== -->
+            <div class="slide" data-index="7">
+                <span class="section-label green">核心概念</span>
+                <h2 class="slide-title">Headless UI：无头组件</h2>
+                <p class="slide-subtitle">只提供行为，不提供样式</p>
+                <div class="compare-grid" style="max-width:750px;">
+                    <div class="compare-card good">
+                        <h4>✅ 负责</h4>
+                        <ul>
+                            <li>状态管理（open/close/selected）</li>
+                            <li>键盘交互（Tab/Enter/Esc）</li>
+                            <li>无障碍访问（ARIA 属性）</li>
+                            <li>焦点管理（Focus Trap）</li>
+                        </ul>
+                    </div>
+                    <div class="compare-card bad">
+                        <h4>❌ 不负责</h4>
+                        <ul>
+                            <li>CSS 样式</li>
+                            <li>UI 风格 / 主题</li>
+                            <li>固定 DOM 结构</li>
+                            <li>任何视觉决策</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==================== 第9页：架构对比 ==================== -->
+            <div class="slide" data-index="8">
+                <span class="section-label accent">架构对比</span>
+                <h2 class="slide-title">架构范式：从耦合到解耦</h2>
+                <p class="slide-subtitle">传统组件库 vs Headless UI 架构</p>
+                <div style="display:flex;gap:40px;align-items:center;flex-wrap:wrap;justify-content:center;">
+                    <!-- 传统 -->
+                    <div style="text-align:center;">
+                        <p style="color:#f44b5c;font-weight:600;margin-bottom:8px;">🔴 传统组件库</p>
+                        <div style="background:rgba(244,75,92,0.08);border:1px solid rgba(244,75,92,0.3);border-radius:10px;padding:16px 20px;color:#d0d0dd;font-size:0.85rem;">
+                            逻辑 + 样式 + DOM<br>→ 强耦合、不可拆分<br><span style="color:#f44b5c;font-size:0.78rem;">改一处动全身</span>
+                        </div>
+                    </div>
+                    <!-- 箭头 -->
+                    <span style="color:#7c5cfc;font-size:2rem;">→</span>
+                    <!-- Headless -->
+                    <div style="text-align:center;">
+                        <p style="color:#3dd68c;font-weight:600;margin-bottom:8px;">🟢 Headless UI 架构</p>
+                        <div class="arch-flow" style="gap:5px;">
+                            <div class="arch-box mid" style="font-size:0.8rem;padding:10px 16px;">行为逻辑层（Radix/Headless UI）</div>
+                            <span class="arch-arrow">↓</span>
+                            <div class="arch-box bot" style="font-size:0.8rem;padding:10px 16px;">视觉层（Tailwind CSS）</div>
+                            <span class="arch-arrow">↓</span>
+                            <div class="arch-box" style="background:rgba(240,184,73,0.1);border:1px solid rgba(240,184,73,0.3);color:#f0b849;font-size:0.8rem;padding:10px 16px;">业务层（自由定制）</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==================== 第10页：代码实战对比 Select ==================== -->
+            <div class="slide" data-index="9">
+                <span class="section-label accent">代码对比</span>
+                <h2 class="slide-title">Dialog 组件：传统 vs Headless 代码量对比</h2>
+                <p class="slide-subtitle">实现一个自定义样式的弹窗组件</p>
+                <div class="code-compare">
+                    <div class="code-compare-col bad">
+                        <span class="col-label">🔴 Ant Design Modal 覆盖</span>
+                        <div class="code-block" style="font-size:0.68rem;line-height:1.5;">
+<span class="cmt">// 样式覆盖文件 modal-override.css</span>
+<span class="kw">.ant-modal</span> .ant-modal-content {
+  <span class="prop">border-radius</span>: <span class="str">16px</span> <span class="kw">!important</span>;
+  <span class="prop">padding</span>: <span class="str">0</span> <span class="kw">!important</span>;
+}
+<span class="kw">.ant-modal</span> .ant-modal-header {
+  <span class="prop">background</span>: <span class="str">#1e1e2c</span> <span class="kw">!important</span>;
+  <span class="prop">border-radius</span>: <span class="str">16px 16px 0 0</span> <span class="kw">!important</span>;
+  <span class="prop">padding</span>: <span class="str">20px 24px</span> <span class="kw">!important</span>;
+}
+<span class="kw">.ant-modal</span> .ant-modal-body {
+  <span class="prop">padding</span>: <span class="str">24px</span> <span class="kw">!important</span>;
+  <span class="prop">background</span>: <span class="str">#16161f</span> <span class="kw">!important</span>;
+}
+<span class="kw">.ant-modal</span> .ant-modal-footer {
+  <span class="prop">border-top</span>: <span class="str">none</span> <span class="kw">!important</span>;
+  <span class="prop">padding</span>: <span class="str">16px 24px</span> <span class="kw">!important</span>;
+}
+<span class="cmt">// + Modal 组件 props 配置</span>
+<span class="cmt">// + 4 个 !important，25+ 行覆盖代码</span></div>
+                    </div>
+                    <div class="code-compare-col good">
+                        <span class="col-label">🟢 Radix Dialog + Tailwind</span>
+                        <div class="code-block" style="font-size:0.68rem;line-height:1.5;">
+<span class="cmt">// 零覆盖，声明式，全部可控</span>
+&lt;<span class="fn">Dialog.Root</span>&gt;
+  &lt;<span class="fn">Dialog.Trigger</span>
+    <span class="prop">className</span>=<span class="str">"btn-primary"</span> /&gt;
+  &lt;<span class="fn">Dialog.Portal</span>&gt;
+    &lt;<span class="fn">Dialog.Overlay</span>
+      <span class="prop">className</span>=<span class="str">"fixed inset-0
+        bg-black/50 backdrop-blur-sm"</span> /&gt;
+    &lt;<span class="fn">Dialog.Content</span>
+      <span class="prop">className</span>=<span class="str">"fixed top-1/2 left-1/2
+        -translate-x-1/2 -translate-y-1/2
+        rounded-2xl bg-[#16161f] p-6"</span>&gt;
+      &lt;<span class="fn">Dialog.Title</span>&gt;...&lt;/<span class="fn">Dialog.Title</span>&gt;
+    &lt;/<span class="fn">Dialog.Content</span>&gt;
+  &lt;/<span class="fn">Dialog.Portal</span>&gt;
+&lt;/<span class="fn">Dialog.Root</span>&gt;
+<span class="cmt">// 0 个 !important，样式完全掌控</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==================== 第11页：Headless 核心价值 ==================== -->
+            <div class="slide" data-index="10">
+                <span class="section-label green">核心价值</span>
+                <h2 class="slide-title">Headless UI 为什么是 Design System 基础？</h2>
+                <p class="slide-subtitle">四大核心优势 + 真实收益</p>
+                <ul class="content-list" style="max-width:650px;">
+                    <li class="headless-item"><strong>逻辑复用</strong>：一套逻辑，多套视觉（Web / RN / 小程序）</li>
+                    <li class="headless-item"><strong>无障碍原生内置</strong>：ARIA / Focus Trap / Keyboard Nav 开箱即用</li>
+                    <li class="headless-item"><strong>无样式入侵</strong>：完美适配团队设计规范，零覆盖</li>
+                    <li class="headless-item">真正实现<strong>逻辑与视觉分离</strong>，升级无惧</li>
+                </ul>
+                <div class="case-card" style="margin-top:16px;max-width:650px;">
+                    <span class="case-tag real">真实案例</span>
+                    <h4>Radix UI 无障碍覆盖</h4>
+                    <p>Dialog 组件内置 Focus Trap + Escape 关闭 + Scroll Lock + ARIA 标注，<br>传统组件库需自行实现，平均 <strong style="color:#f44b5c;">200+ 行</strong> 无障碍代码，Radix <strong style="color:#3dd68c;">0 行</strong></p>
+                </div>
+            </div>
+
+            <!-- ==================== 第12页：Tailwind 本质 ==================== -->
+            <div class="slide" data-index="11">
+                <span class="section-label accent">Tailwind</span>
+                <h2 class="slide-title">Tailwind：不是原子 CSS，是 Design Token Runtime</h2>
+                <p class="slide-subtitle">class="p-4 rounded-xl text-sm" 背后是什么？</p>
+                <div style="display:flex;gap:20px;flex-wrap:wrap;justify-content:center;margin-top:8px;">
+                    <div style="background:rgba(124,92,252,0.08);border:1px solid rgba(124,92,252,0.25);border-radius:10px;padding:16px 20px;text-align:center;">
+                        <p style="color:#b8a4ff;font-weight:600;margin:0 0 4px;">spacing scale</p>
+                        <p style="color:#8b8b9e;font-size:0.8rem;margin:0;">间距体系</p>
+                        <p style="color:#d0d0dd;font-size:0.75rem;margin:4px 0 0;font-family:'JetBrains Mono',monospace;">p-4 → 16px</p>
+                    </div>
+                    <div style="background:rgba(79,143,255,0.08);border:1px solid rgba(79,143,255,0.25);border-radius:10px;padding:16px 20px;text-align:center;">
+                        <p style="color:#4f8fff;font-weight:600;margin:0 0 4px;">radius scale</p>
+                        <p style="color:#8b8b9e;font-size:0.8rem;margin:0;">圆角体系</p>
+                        <p style="color:#d0d0dd;font-size:0.75rem;margin:4px 0 0;font-family:'JetBrains Mono',monospace;">rounded-xl → 12px</p>
+                    </div>
+                    <div style="background:rgba(61,214,140,0.08);border:1px solid rgba(61,214,140,0.25);border-radius:10px;padding:16px 20px;text-align:center;">
+                        <p style="color:#3dd68c;font-weight:600;margin:0 0 4px;">typography scale</p>
+                        <p style="color:#8b8b9e;font-size:0.8rem;margin:0;">字体体系</p>
+                        <p style="color:#d0d0dd;font-size:0.75rem;margin:4px 0 0;font-family:'JetBrains Mono',monospace;">text-sm → 14px</p>
+                    </div>
+                </div>
+                <p style="color:#e0e0ee;margin-top:20px;font-size:1rem;text-align:center;">
+                    用<strong style="color:#7c5cfc;">统一约束</strong>替代无限制自由
+                </p>
+            </div>
+
+            <!-- ==================== 第13页：CSS VS Tailwind 代码对比 ==================== -->
+            <div class="slide" data-index="12">
+                <span class="section-label accent">代码对比</span>
+                <h2 class="slide-title">同一个卡片组件：CSS vs Tailwind</h2>
+                <p class="slide-subtitle">实现一个带 hover 效果的产品卡片</p>
+                <div class="code-compare">
+                    <div class="code-compare-col bad">
+                        <span class="col-label">🔴 传统 CSS</span>
+                        <div class="code-block" style="font-size:0.68rem;line-height:1.5;">
+<span class="cmt">/* card.css - 3个文件，42行 */</span>
+<span class="kw">.product-card</span> {
+  <span class="prop">display</span>: flex;
+  <span class="prop">flex-direction</span>: column;
+  <span class="prop">padding</span>: <span class="str">24px</span>;
+  <span class="prop">border-radius</span>: <span class="str">16px</span>;
+  <span class="prop">background</span>: <span class="str">#1e1e2c</span>;
+  <span class="prop">border</span>: <span class="str">1px solid rgba(255,255,255,0.1)</span>;
+  <span class="prop">transition</span>: <span class="str">all 0.2s</span>;
+}
+<span class="kw">.product-card:hover</span> {
+  <span class="prop">border-color</span>: <span class="str">#7c5cfc</span>;
+  <span class="prop">box-shadow</span>: <span class="str">0 4px 20px
+    rgba(124,92,252,0.15)</span>;
+}
+<span class="kw">.product-card__title</span> { ... }
+<span class="kw">.product-card__price</span> { ... }
+<span class="cmt">// + JSX 中 className 引用</span>
+<span class="cmt">// + 命名冲突风险</span>
+<span class="cmt">// + 设计师改 24→20px 要全局搜索</span></div>
+                    </div>
+                    <div class="code-compare-col good">
+                        <span class="col-label">🟢 Tailwind</span>
+                        <div class="code-block" style="font-size:0.68rem;line-height:1.5;">
+<span class="cmt">&lt;!-- 1个文件，0行CSS --&gt;</span>
+&lt;<span class="fn">div</span> <span class="prop">className</span>=<span class="str">"flex flex-col p-6
+  rounded-2xl bg-card border
+  border-white/10
+  hover:border-accent
+  hover:shadow-[0_4px_20px_rgba(124,92,252,0.15)]
+  transition-all duration-200"</span>&gt;
+  &lt;<span class="fn">h3</span> <span class="prop">className</span>=<span class="str">"text-lg font-semibold
+    text-white"</span>&gt;...&lt;/<span class="fn">h3</span>&gt;
+  &lt;<span class="fn">span</span> <span class="prop">className</span>=<span class="str">"text-2xl
+    font-bold text-accent"</span>&gt;
+    ¥199
+  &lt;/<span class="fn">span</span>&gt;
+&lt;/<span class="fn">div</span>&gt;
+<span class="cmt">// 设计师改 p-6 → p-5，一处即改</span>
+<span class="cmt">// 零命名冲突、零全局搜索</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==================== 第14页：Tailwind + Design System 实战 ==================== -->
+            <div class="slide" data-index="13">
+                <span class="section-label accent">设计系统</span>
+                <h2 class="slide-title">Tailwind = 设计系统运行时</h2>
+                <p class="slide-subtitle">tailwind.config.js — 设计师与开发者的唯一真相源</p>
+                <div class="code-block" style="max-width:700px;font-size:0.75rem;line-height:1.6;">
+<span class="cmt">// tailwind.config.js — 设计 Token 一键映射</span>
+<span class="kw">module.exports</span> = {
+  <span class="prop">theme</span>: {
+    <span class="prop">extend</span>: {
+      <span class="prop">colors</span>: {
+        <span class="cmt">// 设计师色板 → 代码 Token，零误差</span>
+        <span class="prop">primary</span>:   <span class="str">'#7c5cfc'</span>,   <span class="cmt">// 主色</span>
+        <span class="prop">surface</span>:   <span class="str">'#16161f'</span>,   <span class="cmt">// 卡片背景</span>
+        <span class="prop">danger</span>:    <span class="str">'#f44b5c'</span>,   <span class="cmt">// 错误态</span>
+        <span class="prop">success</span>:   <span class="str">'#3dd68c'</span>,   <span class="cmt">// 成功态</span>
+      },
+      <span class="prop">borderRadius</span>: {
+        <span class="prop">lg</span>: <span class="str">'12px'</span>,    <span class="cmt">// 统一圆角</span>
+        <span class="prop">xl</span>: <span class="str">'16px'</span>,
+      },
+      <span class="prop">spacing</span>: {
+        <span class="prop">safe</span>: <span class="str">'env(safe-area-inset-top)'</span>,
+      }
+    }
+  }
+}
+<span class="cmt">// 改 primary 颜色 → 全站秒级生效</span></div>
+            </div>
+
+            <!-- ==================== 第15页：金句 ==================== -->
+            <div class="slide slide-quote" data-index="14">
+                <div class="quote-mark">"</div>
+                <p class="quote-text">
+                    Tailwind 并不是在<strong style="color:#f44b5c;">消灭</strong> CSS，<br>而是在消灭<strong class="highlight">失控</strong>的 CSS。
+                </p>
+            </div>
+
+            <!-- ==================== 第16页：shadcn/ui 核心创新 ==================== -->
+            <div class="slide" data-index="15">
+                <span class="section-label gold">范式革新</span>
+                <h2 class="slide-title">shadcn/ui：不是组件库，是资产方案</h2>
+                <p class="slide-subtitle">核心逻辑：不安装依赖，直接复制源码到项目</p>
+                <div style="max-width:750px;text-align:center;">
+                    <div class="compare-grid" style="margin:0 auto;">
+                        <div class="compare-card bad">
+                            <h4>🔴 传统组件库</h4>
+                            <ul>
+                                <li>npm install 安装</li>
+                                <li>黑盒：源码不可控</li>
+                                <li>你适配组件库</li>
+                                <li>升级 = 风险事件</li>
+                            </ul>
+                        </div>
+                        <div class="compare-card good">
+                            <h4>🟢 shadcn/ui</h4>
+                            <ul>
+                                <li>npx shadcn add 复制</li>
+                                <li>白盒：源码即你代码</li>
+                                <li>组件库适配你</li>
+                                <li>无升级，无版本锁</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <p style="color:#b8a4ff;font-weight:600;font-size:1.05rem;margin-top:16px;">
+                        UI 从「第三方依赖」→「团队自有资产」
+                    </p>
+                </div>
+            </div>
+
+            <!-- ==================== 第17页：shadcn/ui 代码级对比 ==================== -->
+            <div class="slide" data-index="16">
+                <span class="section-label gold">代码对比</span>
+                <h2 class="slide-title">shadcn/ui 安装 vs 传统安装</h2>
+                <p class="slide-subtitle">同样是加一个 Button 组件</p>
+                <div class="code-compare">
+                    <div class="code-compare-col bad">
+                        <span class="col-label">🔴 传统方式</span>
+                        <div class="code-block" style="font-size:0.72rem;line-height:1.5;">
+<span class="cmt"># 安装整个 UI 库</span>
+$ npm install antd
+<span class="cmt"># 引入 Button</span>
+<span class="kw">import</span> { <span class="fn">Button</span> } <span class="kw">from</span> <span class="str">'antd'</span>
+<span class="kw">import</span> <span class="str">'antd/dist/reset.css'</span>
+
+<span class="cmt">// node_modules 增加 12MB+</span>
+<span class="cmt">// Bundle 增加 ~85KB (gzip)</span>
+<span class="cmt">// 只用了 Button，却加载了整个库</span>
+<span class="cmt">// 样式覆盖：覆盖 default → primary</span>
+&lt;<span class="fn">Button</span> <span class="prop">type</span>=<span class="str">"primary"</span>
+  <span class="prop">className</span>=<span class="str">"my-custom-btn"</span>&gt;
+  提交
+&lt;/<span class="fn">Button</span>&gt;</div>
+                    </div>
+                    <div class="code-compare-col good">
+                        <span class="col-label">🟢 shadcn/ui</span>
+                        <div class="code-block" style="font-size:0.72rem;line-height:1.5;">
+<span class="cmt"># 只复制 Button 组件源码</span>
+$ npx shadcn-ui@latest add button
+<span class="cmt"># 直接使用，源码就在你项目里</span>
+<span class="kw">import</span> { <span class="fn">Button</span> } <span class="kw">from</span>
+  <span class="str">'@/components/ui/button'</span>
+
+<span class="cmt">// 零额外依赖</span>
+<span class="cmt">// 只引入用到的组件</span>
+<span class="cmt">// 想改？直接改源码</span>
+&lt;<span class="fn">Button</span>
+  <span class="prop">variant</span>=<span class="str">"default"</span>
+  <span class="prop">size</span>=<span class="str">"lg"</span>&gt;
+  提交
+&lt;/<span class="fn">Button</span>&gt;</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==================== 第18页：数据对比 npm 趋势 ==================== -->
+            <div class="slide" data-index="17">
+                <span class="section-label gold">数据说话</span>
+                <h2 class="slide-title">npm 下载量趋势：范式正在转移</h2>
+                <p class="slide-subtitle">2024-2025 年周下载量增长对比</p>
+                <div class="data-bar-group">
+                    <div class="data-bar-row">
+                        <span class="data-bar-label">antd</span>
+                        <div class="data-bar-track">
+                            <div class="data-bar-fill red" style="width:90%;">~1.8M/周 · 增长 8%</div>
+                        </div>
+                    </div>
+                    <div class="data-bar-row">
+                        <span class="data-bar-label">@mui/material</span>
+                        <div class="data-bar-track">
+                            <div class="data-bar-fill red" style="width:70%;">~1.4M/周 · 增长 5%</div>
+                        </div>
+                    </div>
+                    <div class="data-bar-row">
+                        <span class="data-bar-label">@radix-ui</span>
+                        <div class="data-bar-track">
+                            <div class="data-bar-fill green" style="width:55%;">~1.1M/周 · 增长 45%</div>
+                        </div>
+                    </div>
+                    <div class="data-bar-row">
+                        <span class="data-bar-label">tailwindcss</span>
+                        <div class="data-bar-track">
+                            <div class="data-bar-fill green" style="width:85%;">~1.7M/周 · 增长 60%</div>
+                        </div>
+                    </div>
+                    <div class="data-bar-row">
+                        <span class="data-bar-label">shadcn/ui</span>
+                        <div class="data-bar-track">
+                            <div class="data-bar-fill accent" style="width:40%;">~0.8M/周 · 增长 300%+</div>
+                        </div>
+                    </div>
+                </div>
+                <p style="color:#8b8b9e;font-size:0.82rem;margin-top:14px;text-align:center;">
+                    数据来源：npm trends 2025 · shadcn/ui 增速是传统组件库的 10x+
+                </p>
+            </div>
+
+            <!-- ==================== 第19页：Bundle Size 对比 ==================== -->
+            <div class="slide" data-index="18">
+                <span class="section-label gold">性能对比</span>
+                <h2 class="slide-title">Bundle Size：重量级 vs 轻量级</h2>
+                <p class="slide-subtitle">只使用 Button + Dialog 的打包体积 (gzip)</p>
+                <div class="data-bar-group">
+                    <div class="data-bar-row">
+                        <span class="data-bar-label">antd</span>
+                        <div class="data-bar-track">
+                            <div class="data-bar-fill red" style="width:95%;">~320KB</div>
+                        </div>
+                    </div>
+                    <div class="data-bar-row">
+                        <span class="data-bar-label">@mui/material</span>
+                        <div class="data-bar-track">
+                            <div class="data-bar-fill red" style="width:70%;">~235KB</div>
+                        </div>
+                    </div>
+                    <div class="data-bar-row">
+                        <span class="data-bar-label">Element Plus</span>
+                        <div class="data-bar-track">
+                            <div class="data-bar-fill red" style="width:65%;">~218KB</div>
+                        </div>
+                    </div>
+                    <div class="data-bar-row">
+                        <span class="data-bar-label">Radix + Tailwind</span>
+                        <div class="data-bar-track">
+                            <div class="data-bar-fill green" style="width:22%;">~72KB</div>
+                        </div>
+                    </div>
+                    <div class="data-bar-row">
+                        <span class="data-bar-label">shadcn/ui</span>
+                        <div class="data-bar-track">
+                            <div class="data-bar-fill green" style="width:15%;">~48KB</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="metric-row" style="margin-top:16px;">
+                    <div class="metric-item green">
+                        <div class="metric-value">-85%</div>
+                        <div class="metric-label">体积减少</div>
+                    </div>
+                    <div class="metric-item green">
+                        <div class="metric-value">-70%</div>
+                        <div class="metric-label">加载时间</div>
+                    </div>
+                    <div class="metric-item accent">
+                        <div class="metric-value">0</div>
+                        <div class="metric-label">运行时依赖</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==================== 第20页：shadcn/ui 价值总结 ==================== -->
+            <div class="slide" data-index="19">
+                <span class="section-label gold">价值总结</span>
+                <h2 class="slide-title">最大创新：Ownership（所有权）</h2>
+                <p class="slide-subtitle">组件所有权回归业务团队，而非被第三方库绑架</p>
+                <div class="compare-grid" style="max-width:800px;">
+                    <div class="compare-card bad">
+                        <h4>🔴 传统：租户模式</h4>
+                        <ul>
+                            <li>组件归第三方所有</li>
+                            <li>你能用，但不能改核心</li>
+                            <li>版本升级 = 被动接受变更</li>
+                            <li>Breaking Change 随时可能来</li>
+                        </ul>
+                    </div>
+                    <div class="compare-card good">
+                        <h4>🟢 shadcn/ui：业主模式</h4>
+                        <ul>
+                            <li>组件归你的项目所有</li>
+                            <li>源码在你项目里，随便改</li>
+                            <li>无版本依赖，无升级压力</li>
+                            <li>变更完全由你掌控</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==================== 第21页：金句 ==================== -->
+            <div class="slide slide-quote" data-index="20">
+                <div class="quote-mark">"</div>
+                <p class="quote-text">
+                    shadcn/ui 最大的创新，<br>不是<strong style="color:#8b8b9e;">组件</strong>，而是<strong class="highlight">ownership</strong>。
+                </p>
+            </div>
+
+            <!-- ==================== 第22页：AI 时代 UI 变革 ==================== -->
+            <div class="slide" data-index="21">
+                <span class="section-label accent">AI 赋能</span>
+                <h2 class="slide-title">AI Coding：重新定义 UI 开发</h2>
+                <p class="slide-subtitle">AI 最擅长 vs AI 最头疼</p>
+                <div class="compare-grid" style="max-width:800px;">
+                    <div class="compare-card good">
+                        <h4>✅ AI 最擅长生成</h4>
+                        <ul>
+                            <li>Tailwind class：p-4 rounded-xl</li>
+                            <li>标准化结构：组件 + Token</li>
+                            <li>可预测、可推理的代码</li>
+                            <li>无歧义的设计 Token 映射</li>
+                        </ul>
+                    </div>
+                    <div class="compare-card bad">
+                        <h4>❌ AI 最头疼生成</h4>
+                        <ul>
+                            <li>自定义 CSS 命名：.my-wrapper</li>
+                            <li>深层嵌套覆盖：.a .b .c .d {}</li>
+                            <li>语义不明的 BEM 变体</li>
+                            <li>组件库内部样式结构</li>
+                        </ul>
+                    </div>
+                </div>
+                <p style="color:#e0e0ee;margin-top:14px;text-align:center;font-size:1rem;">
+                    <strong style="color:#7c5cfc;">Tailwind 是 AI 时代最友好的 UI DSL</strong><br>
+                    <span style="font-size:0.9rem;color:#b0b0c0;">可预测、可生成、可推理、可批量产出</span>
+                </p>
+            </div>
+
+            <!-- ==================== 第23页：AI 实战对比 ==================== -->
+            <div class="slide" data-index="22">
+                <span class="section-label accent">AI 实战</span>
+                <h2 class="slide-title">同一个需求：AI 生成代码质量对比</h2>
+                <p class="slide-subtitle">Prompt：「创建一个带搜索和筛选的用户管理表格」</p>
+                <div class="code-compare">
+                    <div class="code-compare-col bad">
+                        <span class="col-label">🔴 Ant Design 方案</span>
+                        <div class="code-block" style="font-size:0.65rem;line-height:1.45;">
+<span class="cmt">// AI 需要理解：</span>
+<span class="cmt">// 1. antd Table 的 columns 配置</span>
+<span class="cmt">// 2. antd Form 的 Field 绑定</span>
+<span class="cmt">// 3. 样式覆盖选择器层级</span>
+<span class="cmt">// 4. 主题变量 token 体系</span>
+<span class="kw">const</span> columns = [
+  { <span class="prop">title</span>: <span class="str">'姓名'</span>,
+    <span class="prop">render</span>: (_, r) =&gt;
+      &lt;<span class="fn">Space</span>&gt;
+        &lt;<span class="fn">Avatar</span> <span class="prop">src</span>={r.avatar} /&gt;
+        {r.name}
+      &lt;/<span class="fn">Space</span>&gt; },
+  <span class="cmt">// ...5+ 列配置</span>
+]
+<span class="cmt">// + 样式覆盖文件 80+ 行</span>
+<span class="cmt">// + 主题定制 ConfigProvider</span>
+<span class="cmt">// 结果：AI 多次重试，样式不一致</span></div>
+                    </div>
+                    <div class="code-compare-col good">
+                        <span class="col-label">🟢 shadcn/ui + Tailwind</span>
+                        <div class="code-block" style="font-size:0.65rem;line-height:1.45;">
+<span class="cmt">// AI 只需理解：</span>
+<span class="cmt">// 1. 标准 HTML 结构</span>
+<span class="cmt">// 2. Tailwind class 语义</span>
+<span class="cmt">// 3. shadcn 组件 API（极简）</span>
+&lt;<span class="fn">Table</span>&gt;
+  &lt;<span class="fn">TableHeader</span>&gt;
+    &lt;<span class="fn">TableRow</span>&gt;
+      &lt;<span class="fn">TableHead</span>&gt;姓名&lt;/<span class="fn">TableHead</span>&gt;
+    &lt;/<span class="fn">TableRow</span>&gt;
+  &lt;/<span class="fn">TableHeader</span>&gt;
+  &lt;<span class="fn">TableBody</span>&gt;
+    {users.map(u =&gt; (
+      &lt;<span class="fn">TableRow</span> <span class="prop">key</span>={u.id}&gt;
+        &lt;<span class="fn">TableCell</span>
+          <span class="prop">className</span>=<span class="str">"flex items-center gap-2"</span>&gt;
+          &lt;<span class="fn">Avatar</span> <span class="prop">src</span>={u.avatar} /&gt;
+          {u.name}
+        &lt;/<span class="fn">TableCell</span>&gt;
+      &lt;/<span class="fn">TableRow</span>&gt;
+    ))}
+  &lt;/<span class="fn">TableBody</span>&gt;
+&lt;/<span class="fn">Table</span>&gt;
+<span class="cmt">// 结果：一次生成，直接可用</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==================== 第24页：AI + shadcn/ui 工作流 ==================== -->
+            <div class="slide" data-index="23">
+                <span class="section-label accent">AI 工作流</span>
+                <h2 class="slide-title">新一代开发方式：AI 一键生成</h2>
+                <p class="slide-subtitle">工具：Cursor / Claude Code / Copilot</p>
+                <div style="max-width:700px;text-align:left;">
+                    <p style="color:#b8b8cc;font-size:0.9rem;margin-bottom:8px;">输入 Prompt：</p>
+                    <div class="code-block" style="max-width:100%;font-size:0.82rem;">
+<span class="cmt">生成一个 SaaS 后台首页，包含：侧边栏导航、</span>
+<span class="cmt">数据统计卡片、用户列表表格、搜索筛选功能</span>
+<span class="cmt">使用 shadcn/ui + Tailwind，支持暗黑模式</span>
+                    </div>
+                    <p style="color:#b8b8cc;font-size:0.9rem;margin:14px 0 8px;">AI 一次性输出：</p>
+                    <ul class="content-list">
+                        <li class="headless-item">✅ 完整 Tailwind 样式，100% 遵循 Design Token</li>
+                        <li class="headless-item">✅ shadcn/ui 组件，源码完全可控</li>
+                        <li class="headless-item">✅ 响应式布局，移动端自适应</li>
+                        <li class="headless-item">✅ 暗黑模式，dark: 前缀一行搞定</li>
+                        <li class="headless-item">✅ 生成时间 &lt; 30s，传统开发需 2-4h</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- ==================== 第25页：金句 ==================== -->
+            <div class="slide slide-quote" data-index="24">
+                <div class="quote-mark">"</div>
+                <p class="quote-text">
+                    AI 时代最重要的，<br>不是<strong style="color:#8b8b9e;">写 UI</strong>，而是<strong class="highlight">定义 UI 系统</strong>。
+                </p>
+            </div>
+
+            <!-- ==================== 第26页：未来四大趋势 ==================== -->
+            <div class="slide" data-index="25">
+                <span class="section-label accent">趋势总结</span>
+                <h2 class="slide-title">下一代前端 UI 架构趋势</h2>
+                <p class="slide-subtitle">四大核心方向</p>
+                <div class="trend-grid">
+                    <div class="trend-card">
+                        <h4>🔮 无头化</h4>
+                        <p>逻辑与视觉彻底解耦<br><span style="color:#7c5cfc;font-size:0.78rem;">Radix UI / Headless UI / Ark UI</span></p>
+                    </div>
+                    <div class="trend-card">
+                        <h4>🪙 Token 化</h4>
+                        <p>Design System 成为核心基建<br><span style="color:#7c5cfc;font-size:0.78rem;">Tailwind CSS / CSS Variables / Style Dict</span></p>
+                    </div>
+                    <div class="trend-card">
+                        <h4>🤖 AI Native</h4>
+                        <p>UI 开发以生成式为主<br><span style="color:#7c5cfc;font-size:0.78rem;">Cursor / Claude Code / v0.dev</span></p>
+                    </div>
+                    <div class="trend-card">
+                        <h4>📦 资产化</h4>
+                        <p>组件成为团队自有可复用资产<br><span style="color:#7c5cfc;font-size:0.78rem;">shadcn/ui / Copy-Paste Paradigm</span></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==================== 第27页：迁移路径 ==================== -->
+            <div class="slide" data-index="26">
+                <span class="section-label green">落地实践</span>
+                <h2 class="slide-title">从传统到新范式的迁移路径</h2>
+                <p class="slide-subtitle">渐进式迁移，不搞一刀切</p>
+                <div style="max-width:800px;width:100%;">
+                    <div class="arch-flow" style="gap:6px;">
+                        <div class="arch-box" style="background:rgba(244,75,92,0.1);border:1px solid rgba(244,75,92,0.3);color:#f44b5c;font-size:0.85rem;padding:12px 20px;">
+                            Phase 1：新页面试点<br><span style="font-size:0.78rem;color:#b0b0c0;">新模块用 shadcn/ui + Tailwind，老页面不动</span>
+                        </div>
+                        <span class="arch-arrow">↓</span>
+                        <div class="arch-box" style="background:rgba(79,143,255,0.1);border:1px solid rgba(79,143,255,0.3);color:#4f8fff;font-size:0.85rem;padding:12px 20px;">
+                            Phase 2：建立 Design Token<br><span style="font-size:0.78rem;color:#b0b0c0;">统一 tailwind.config，对齐设计师色板/间距/字体</span>
+                        </div>
+                        <span class="arch-arrow">↓</span>
+                        <div class="arch-box" style="background:rgba(124,92,252,0.1);border:1px solid rgba(124,92,252,0.3);color:#b8a4ff;font-size:0.85rem;padding:12px 20px;">
+                            Phase 3：逐页替换<br><span style="font-size:0.78rem;color:#b0b0c0;">从简单页面开始，逐步替换 antd → shadcn/ui</span>
+                        </div>
+                        <span class="arch-arrow">↓</span>
+                        <div class="arch-box bot" style="font-size:0.85rem;padding:12px 20px;">
+                            Phase 4：全面统一<br><span style="font-size:0.78rem;color:#b0b0c0;">移除 antd 依赖，全站 shadcn/ui + Tailwind</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==================== 第28页：推荐技术栈 ==================== -->
+            <div class="slide" data-index="27">
+                <span class="section-label green">推荐方案</span>
+                <h2 class="slide-title">团队落地最佳实践</h2>
+                <p class="slide-subtitle">推荐技术栈与工具链</p>
+                <div style="max-width:750px;width:100%;text-align:left;">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                        <div style="background:rgba(124,92,252,0.06);border:1px solid rgba(124,92,252,0.2);border-radius:10px;padding:16px 18px;">
+                            <p style="color:#b8a4ff;font-weight:600;margin:0 0 8px;font-size:0.95rem;">核心框架</p>
+                            <p style="color:#d0d0dd;font-size:0.85rem;margin:0;line-height:1.7;">Radix UI（行为层）<br>Tailwind CSS（样式层）<br>shadcn/ui（组件资产）</p>
+                        </div>
+                        <div style="background:rgba(79,143,255,0.06);border:1px solid rgba(79,143,255,0.2);border-radius:10px;padding:16px 18px;">
+                            <p style="color:#4f8fff;font-weight:600;margin:0 0 8px;font-size:0.95rem;">开发工具</p>
+                            <p style="color:#d0d0dd;font-size:0.85rem;margin:0;line-height:1.7;">Storybook（组件文档）<br>Cursor / Claude Code（AI 开发）<br>Figma Token Sync（设计同步）</p>
+                        </div>
+                    </div>
+                    <div class="case-card" style="margin-top:16px;max-width:100%;">
+                        <span class="case-tag impact">关键收益</span>
+                        <h4>迁移后预期收益</h4>
+                        <p>样式覆盖代码减少 <strong style="color:#3dd68c;">80%+</strong> · 组件定制效率提升 <strong style="color:#3dd68c;">5x</strong> · Bundle 体积减少 <strong style="color:#3dd68c;">60%+</strong> · AI 生成可用率从 <strong style="color:#f44b5c;">30%</strong> 提升到 <strong style="color:#3dd68c;">90%+</strong></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==================== 第29页：总结升华 ==================== -->
+            <div class="slide slide-quote" data-index="28">
+                <div class="quote-mark">✦</div>
+                <p class="quote-text" style="font-size:1.6rem;">
+                    未来前端工程师<br>不再只是<strong style="color:#8b8b9e;">「写页面」</strong><br>而是设计<strong class="highlight">可组合、可生成、可扩展</strong>的 UI 系统
+                </p>
+            </div>
+
+            <!-- ==================== 第30页：金句结尾 ==================== -->
+            <div class="slide slide-quote" data-index="29">
+                <div class="quote-mark">"</div>
+                <p class="quote-text">
+                    未来的前端工程师，<br>将越来越像<strong class="highlight">「UI 架构师」</strong>。
+                </p>
+            </div>
+
+            <!-- ==================== 第31页：实战 Demo ==================== -->
+            <div class="slide" data-index="30">
+                <span class="section-label green">实战 Demo</span>
+                <h2 class="slide-title">现场演示 3 个核心案例</h2>
+                <p class="slide-subtitle">直观感受架构差异</p>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:850px;width:100%;">
+                    <div style="background:rgba(244,75,92,0.05);border:1px solid rgba(244,75,92,0.2);border-radius:12px;padding:18px 14px;text-align:center;">
+                        <h4 style="color:#f44b5c;font-size:0.95rem;margin:0 0 8px;">🔴 Antd VS shadcn/ui</h4>
+                        <p style="color:#b0b0c0;font-size:0.8rem;line-height:1.5;margin:0;">同个卡片<br>定制效率、样式自由度对比</p>
+                    </div>
+                    <div style="background:rgba(79,143,255,0.05);border:1px solid rgba(79,143,255,0.2);border-radius:12px;padding:18px 14px;text-align:center;">
+                        <h4 style="color:#4f8fff;font-size:0.95rem;margin:0 0 8px;">🔵 Tailwind 一键换肤</h4>
+                        <p style="color:#b0b0c0;font-size:0.8rem;line-height:1.5;margin:0;">修改 config →<br>全站主题同步生效</p>
+                    </div>
+                    <div style="background:rgba(61,214,140,0.05);border:1px solid rgba(61,214,140,0.2);border-radius:12px;padding:18px 14px;text-align:center;">
+                        <h4 style="color:#3dd68c;font-size:0.95rem;margin:0 0 8px;">🟢 Cursor AI 现场生成</h4>
+                        <p style="color:#b0b0c0;font-size:0.8rem;line-height:1.5;margin:0;">输入需求 →<br>30s 生成可落地后台页面</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==================== 第32页：Q&A ==================== -->
+            <div class="slide" data-index="31">
+                <span class="section-label green">Q&A</span>
+                <h2 class="slide-title">感谢聆听，欢迎交流</h2>
+                <p class="slide-subtitle">讨论与提问</p>
+                <div style="max-width:650px;width:100%;text-align:left;">
+                    <div class="case-card" style="max-width:100%;">
+                        <span class="case-tag real">延伸思考</span>
+                        <h4>几个值得讨论的问题</h4>
+                        <p style="line-height:2;">
+                            1. 现有项目如何渐进式迁移，不影响线上？<br>
+                            2. 团队没有设计师，Design Token 从何而来？<br>
+                            3. shadcn/ui 的组件不够用怎么办？<br>
+                            4. Headless 组件的无障碍支持到底有多重要？<br>
+                            5. AI 生成代码的可维护性如何保障？
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /slides-wrapper -->
+    </div><!-- /stage -->
+
+    <script>
+        (function() {
+            const slides = document.querySelectorAll('.slide');
+            const totalSlides = slides.length;
+            let currentIndex = 0;
+            let isAnimating = false;
+
+            // 构建底部指示器
+            const indicatorBar = document.getElementById('indicatorBar');
+            const dots = [];
+            // 添加页码文字
+            const numSpan = document.createElement('span');
+            numSpan.className = 'indicator-num';
+            numSpan.textContent = `1/${totalSlides}`;
+            indicatorBar.appendChild(numSpan);
+
+            for (let i = 0; i < totalSlides; i++) {
+                const dot = document.createElement('span');
+                dot.className = 'indicator-dot';
+                if (i === 0) dot.classList.add('active');
+                dot.title = `第 ${i + 1} 页`;
+                dot.addEventListener('click', () => goToSlide(i));
+                indicatorBar.appendChild(dot);
+                dots.push(dot);
+            }
+
+            const numSpanEnd = document.createElement('span');
+            numSpanEnd.className = 'indicator-num';
+            numSpanEnd.textContent = `/${totalSlides}`;
+            numSpanEnd.style.opacity = '0.6';
+            indicatorBar.appendChild(numSpanEnd);
+
+            function updateIndicator() {
+                dots.forEach((d, i) => {
+                    d.classList.toggle('active', i === currentIndex);
+                });
+                numSpan.textContent = `${currentIndex + 1}/${totalSlides}`;
+            }
+
+            function goToSlide(targetIndex, direction = null) {
+                if (isAnimating || targetIndex === currentIndex) return;
+                if (targetIndex < 0 || targetIndex >= totalSlides) return;
+
+                isAnimating = true;
+                const oldSlide = slides[currentIndex];
+                const newSlide = slides[targetIndex];
+
+                // 确定方向
+                let dir = direction;
+                if (dir === null) {
+                    dir = targetIndex > currentIndex ? 'next' : 'prev';
+                }
+
+                // 清理所有状态类
+                slides.forEach(s => {
+                    s.classList.remove('active', 'exit-left', 'exit-right', 'enter-from-left',
+                        'enter-from-right');
+                });
+
+                // 设置旧slide退出
+                if (dir === 'next') {
+                    oldSlide.classList.add('exit-left');
+                } else {
+                    oldSlide.classList.add('exit-right');
+                }
+
+                // 设置新slide进入
+                if (dir === 'next') {
+                    newSlide.classList.add('enter-from-right');
+                } else {
+                    newSlide.classList.add('enter-from-left');
+                }
+
+                // 强制回流
+                void newSlide.offsetWidth;
+
+                // 激活新slide
+                newSlide.classList.remove('enter-from-left', 'enter-from-right');
+                newSlide.classList.add('active');
+                oldSlide.classList.remove('active');
+
+                currentIndex = targetIndex;
+                updateIndicator();
+
+                // 动画结束后清理
+                const cleanup = () => {
+                    slides.forEach(s => {
+                        s.classList.remove('exit-left', 'exit-right', 'enter-from-left',
+                            'enter-from-right');
+                    });
+                    isAnimating = false;
+                };
+
+                // 监听transition结束
+                const handler = () => {
+                    oldSlide.removeEventListener('transitionend', handler);
+                    cleanup();
+                };
+                oldSlide.addEventListener('transitionend', handler, { once: true });
+
+                // 兜底清理
+                setTimeout(() => {
+                    if (isAnimating) {
+                        cleanup();
+                        isAnimating = false;
+                    }
+                }, 500);
+            }
+
+            function nextSlide() {
+                if (currentIndex < totalSlides - 1) {
+                    goToSlide(currentIndex + 1, 'next');
+                }
+            }
+
+            function prevSlide() {
+                if (currentIndex > 0) {
+                    goToSlide(currentIndex - 1, 'prev');
+                }
+            }
+
+            // 键盘导航
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
+                    e.preventDefault();
+                    nextSlide();
+                } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    prevSlide();
+                } else if (e.key === 'Home') {
+                    e.preventDefault();
+                    goToSlide(0, 'prev');
+                } else if (e.key === 'End') {
+                    e.preventDefault();
+                    goToSlide(totalSlides - 1, 'next');
+                } else if (e.key === 'f' || e.key === 'F') {
+                    e.preventDefault();
+                    toggleFullscreen();
+                }
+            });
+
+            // 触摸滑动
+            let touchStartX = 0;
+            let touchStartY = 0;
+            const stage = document.getElementById('stage');
+            stage.addEventListener('touchstart', (e) => {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+            }, { passive: true });
+            stage.addEventListener('touchend', (e) => {
+                const dx = e.changedTouches[0].clientX - touchStartX;
+                const dy = e.changedTouches[0].clientY - touchStartY;
+                if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
+                    if (dx < -30) {
+                        nextSlide();
+                    } else if (dx > 30) {
+                        prevSlide();
+                    }
+                }
+            });
+
+            // 鼠标滚轮
+            let wheelTimeout;
+            stage.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                if (wheelTimeout) return;
+                wheelTimeout = setTimeout(() => { wheelTimeout = null; }, 600);
+                if (e.deltaY > 20 || e.deltaX > 20) {
+                    nextSlide();
+                } else if (e.deltaY < -20 || e.deltaX < -20) {
+                    prevSlide();
+                }
+            }, { passive: false });
+
+            // 暴露到全局
+            window.nextSlide = nextSlide;
+            window.prevSlide = prevSlide;
+            window.goToSlide = goToSlide;
+
+            // 初始化
+            updateIndicator();
+        })();
+
+        // 全屏切换
+        function toggleFullscreen() {
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                const el = document.documentElement;
+                if (el.requestFullscreen) {
+                    el.requestFullscreen().catch(() => {});
+                } else if (el.webkitRequestFullscreen) {
+                    el.webkitRequestFullscreen();
+                }
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                }
+            }
+        }
+        window.toggleFullscreen = toggleFullscreen;
+
+        // 打印当前页信息
+        console.log('📊 PPT 已就绪 | 共 ' + document.querySelectorAll('.slide').length + ' 页');
+        console.log('⌨️  快捷键：← → 切换页面 | Home/End 首尾页 | F 全屏 | 空格键下一页');
+        console.log('🖱️  支持鼠标滚轮切换、触摸滑动切换');
+        console.log('👆 点击底部圆点可跳转到指定页面');
+    </script>
+</body>
+</html>
